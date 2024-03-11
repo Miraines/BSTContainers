@@ -34,26 +34,26 @@ class BinarySearchTree {
   Node* root; // Указатель на корень дерева
 
  public:
-  // Определение итератора
+
   template<typename Order>
-  class iterator {
+  class const_iterator {
    public:
     using iterator_category = std::bidirectional_iterator_tag;
-    using value_type = T;
+    using value_type = const T; // Используем const T вместо T
     using difference_type = std::ptrdiff_t;
-    using pointer = T*;
-    using reference = T&;
+    using pointer = const T*; // Константный указатель
+    using reference = const T&; // Константная ссылка
 
     // Конструктор
-    iterator(Node* node = nullptr) : node(node) {}
+    const_iterator(const Node* node = nullptr, const Node* root = nullptr) : node(node), root(root) {}
 
     // Операторы инкремента и декремента
-    iterator& operator++() {
+    const_iterator& operator++() {
       increment(Order());
       return *this;
     }
 
-    iterator& operator--() {
+    const_iterator& operator--() {
       decrement(Order());
       return *this;
     }
@@ -66,16 +66,20 @@ class BinarySearchTree {
       return &(node->value);
     }
 
-    bool operator==(const iterator& other) const {
+    bool operator==(const const_iterator& other) const {
       return node == other.node;
     }
 
-    bool operator!=(const iterator& other) const {
+    bool operator!=(const const_iterator& other) const {
       return node != other.node;
     }
 
+    const Node* get_node() const { return node; }
+
    private:
-    Node* node;
+    const Node* node;
+    const Node* root; // Добавляем указатель на корень дерева
+
 
     void increment(InOrder) {
       if (node == nullptr) {
@@ -118,121 +122,110 @@ class BinarySearchTree {
       if (node == nullptr) {
         return;
       }
-      if (node->parent == nullptr || node == node->parent->left && node->parent->right != nullptr) {
-        node = node->parent->right;
+      // Если текущий узел - левый потомок и у родителя есть правый потомок
+      if (node->parent != nullptr && node == node->parent->left && node->parent->right != nullptr) {
+        node = node->parent->right; // Переход к правому потомку родителя
+        // Ищем самый левый узел в поддереве правого потомка
         while (node->left != nullptr || node->right != nullptr) {
           while (node->left != nullptr) {
             node = node->left;
           }
+          // Проверяем, не равен ли правый потомок nullptr перед переходом
           if (node->right != nullptr) {
             node = node->right;
+          } else {
+            break; // Выходим из цикла, если правый потомок равен nullptr
           }
         }
       } else {
-        node = node->parent;
+        // Случай, когда текущий узел - правый потомок или у родителя нет правого потомка
+        // Возвращаемся к родителю, но сначала проверяем, не равен ли он nullptr
+        if (node->parent != nullptr) {
+          node = node->parent;
+        } else {
+          node = nullptr; // Устанавливаем node в nullptr, если достигнут корень
+        }
       }
     }
 
     void decrement(InOrder) {
       if (node == nullptr) {
-        return;
-      }
-      if (node->left != nullptr) {
+        // Находим максимальный элемент в дереве, если текущий узел равен nullptr
+        node = root;
+        if (node == nullptr) return; // Пустое дерево
+        while (node->right != nullptr) {
+          node = node->right;
+        }
+      } else if (node->left != nullptr) {
         node = node->left;
         while (node->right != nullptr) {
           node = node->right;
         }
       } else {
-        while (node->parent != nullptr && node == node->parent->left) {
+        const Node* tmp = node;
+        node = node->parent;
+        while (node != nullptr && tmp == node->left) {
+          tmp = node;
           node = node->parent;
         }
-        node = node->parent;
       }
     }
 
     void decrement(PreOrder) {
-      if (node == nullptr || node->parent == nullptr) {
-        // Если узел nullptr или корень дерева, декремент невозможен.
+      if (node == nullptr) {
+        // Если узел nullptr, декремент невозможен.
         return;
       }
 
-      if (node == node->parent->right) {
-        // Если текущий узел является правым потомком
-        if (node->parent->left != nullptr) {
-          // Если у родителя есть левый потомок, переходим к самому правому узлу в этом поддереве
-          node = node->parent->left;
-          while (node->right != nullptr || node->left != nullptr) {
-            while (node->right != nullptr) {
-              node = node->right;
-            }
-            if (node->left != nullptr) {
-              node = node->left;
-            }
+      if (node->parent == nullptr) {
+        // Если текущий узел - корень дерева, переходим к состоянию, указывающему на конец итерации
+        node = nullptr;
+        return;
+      }
+
+      if (node == node->parent->right && node->parent->left != nullptr) {
+        // Если текущий узел является правым потомком и у родителя есть левый потомок
+        node = node->parent->left;
+        while (node->right != nullptr || node->left != nullptr) {
+          // Переходим к самому правому узлу в поддереве левого потомка
+          while (node->right != nullptr) {
+            node = node->right;
           }
-        } else {
-          // Если у родителя нет левого потомка, предыдущим узлом является родитель
-          node = node->parent;
+          if (node->left != nullptr) {
+            node = node->left;
+          }
         }
-      } else if (node == node->parent->left) {
-        // Если текущий узел является левым потомком, предыдущим узлом является родитель
+      } else {
+        // В остальных случаях предыдущим узлом является родитель
         node = node->parent;
       }
     }
 
     void decrement(PostOrder) {
       if (node == nullptr) {
-        return;
-      }
-      if (node->parent == nullptr) {
-        node = nullptr;
-      } else if (node == node->parent->right || node->parent->left == nullptr) {
-        node = node->parent;
-      } else if (node->parent->right != nullptr) {
-        node = node->parent->right;
-        while (node->left != nullptr || node->right != nullptr) {
-          while (node->right != nullptr) {
-            node = node->right;
-          }
-          if (node->left != nullptr) {
-            node = node->left;
-          }
-        }
+        node = root; // Начинаем с корня, если текущий узел не указан
+      } else if (node->right != nullptr) {
+        node = node->right; // Переходим к правому потомку, если он существует
+      } else if (node->left != nullptr) {
+        node = node->left; // В противном случае переходим к левому потомку, если он существует
       } else {
-        node = node->parent->left;
-        while (node->left != nullptr || node->right != nullptr) {
-          while (node->right != nullptr) {
-            node = node->right;
-          }
-          if (node->left != nullptr) {
-            node = node->left;
-          }
+        // Если узел является листом, поднимаемся вверх по дереву
+        Node* parent = node->parent;
+        while (parent && (parent->left == nullptr || node == parent->left)) {
+          node =
+              parent; // Поднимаемся, пока текущий узел является левым потомком или пока родительский узел не имеет левого потомка
+          parent = node->parent;
+        }
+        if (parent) {
+          node = parent->left; // Переходим к левому потомку родительского узла, если таковой имеется
+        } else {
+          node = nullptr; // Иначе мы достигли корня, завершаем обход
         }
       }
     }
   };
 
-  template<typename Order>
-  class const_iterator {
-   public:
-    using iterator_category = std::bidirectional_iterator_tag;
-    using value_type = T;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const T*;  // Константный указатель
-    using reference = const T&;  // Константная ссылка
-   private:
-    // Внутренние данные, такие как указатель на текущий узел дерева
-  };
-
-  using iterator_in_order = iterator<InOrder>;
-  using iterator_pre_order = iterator<PreOrder>;
-  using iterator_post_order = iterator<PostOrder>;
-  using const_iterator_in_order = const_iterator<InOrder>;
-  using const_iterator_pre_order = const_iterator<PreOrder>;
-  using const_iterator_post_order = const_iterator<PostOrder>;
-  using reverse_iterator_in_order = std::reverse_iterator<iterator<InOrder>>;
-  using const_reverse_iterator_in_order = std::reverse_iterator<const_iterator<InOrder>>;
-
-  // Конструкторы и деструктор
+  // Конструкторы и деструктор + методы для них
   void clear(Node* node) noexcept {
     if (node) {
       clear(node->left);
@@ -241,10 +234,12 @@ class BinarySearchTree {
       node_allocator_.deallocate(node, 1);
     }
   }
+
   void clear() noexcept {
     clear(root);
     root = nullptr;
   }
+
   Node* copy(Node* node, Node* parent = nullptr) {
     if (!node) {
       return nullptr;
@@ -255,22 +250,24 @@ class BinarySearchTree {
     new_node->right = copy(node->right, new_node);
     return new_node;
   }
+
   BinarySearchTree() noexcept: node_allocator_(allocator_type()), root(nullptr) {}
+
   BinarySearchTree(const BinarySearchTree& other) {
     root = copy(other.root);
   }
+
   ~BinarySearchTree() {
-    clear(); // Вызов функции, очищающей дерево
+    clear();
   }
 
-  // Оператор присваивания
   // Функция обмена
   void swap(BinarySearchTree& other) noexcept {
     using std::swap;
     swap(root, other.root);
     swap(node_allocator_, other.node_allocator_);
-    // Обмен других членов класса, если они есть
   }
+
   BinarySearchTree& operator=(const BinarySearchTree& other) {
     swap(other);
     return *this;
@@ -278,13 +275,14 @@ class BinarySearchTree {
 
   // Методы для работы с узлами
   Node* allocateNode(const value_type& value) {
-    Node* node = node_allocator_.allocate(1); // Используем NodeAllocator для выделения памяти для одного узла
+    Node* node = node_allocator_.allocate(1);
     try {
-      node_allocator_.construct(node, value); // Используем NodeAllocator для конструирования узла
+      node_allocator_.construct(node, value);
     } catch (...) {
-      node_allocator_.deallocate(node, 1); // В случае исключения освобождаем выделенную память
-      throw; // Перебрасываем исключение
+      node_allocator_.deallocate(node, 1);
+      throw;
     }
+
     return node;
   }
 
@@ -321,18 +319,19 @@ class BinarySearchTree {
     }
   }
 
-  iterator<InOrder> find(const value_type& value) {
+  const_iterator<InOrder> find(const value_type& value) {
     Node* current = root; // Начинаем поиск с корня дерева
     while (current != nullptr) {
       if (value == current->value) {
-        return iterator<InOrder>(current); // Найденный узел возвращается как итератор
+        return const_iterator<InOrder>(current); // Найденный узел возвращается как итератор
       } else if (value < current->value) {
         current = current->left; // Переход к левому поддереву
       } else {
         current = current->right; // Переход к правому поддереву
       }
     }
-    return iterator<InOrder>(nullptr); // Возвращаем итератор на nullptr, если значение не найдено
+
+    return const_iterator<InOrder>(nullptr); // Возвращаем итератор на nullptr, если значение не найдено
   }
 
   bool exist(const value_type& value) {
@@ -346,34 +345,40 @@ class BinarySearchTree {
         current = current->right; // Переход к правому поддереву, если значение больше текущего
       }
     }
+
     return false; // Если значение не найдено в дереве, возвращаем false
   }
 
-  iterator<InOrder> findMin() {
+  const_iterator<InOrder> findMin() {
     if (root == nullptr) {
-      return iterator<InOrder>(nullptr); // Если дерево пустое, возвращаем итератор, указывающий на nullptr
+
+      return const_iterator<InOrder>(nullptr); // Если дерево пустое, возвращаем итератор, указывающий на nullptr
     }
 
     Node* current = root;
     while (current->left != nullptr) { // Переходим к самому левому узлу
       current = current->left;
     }
-    return iterator<InOrder>(current); // Возвращаем итератор, указывающий на минимальный элемент
+
+    return const_iterator<InOrder>(current); // Возвращаем итератор, указывающий на минимальный элемент
   }
 
-  iterator<InOrder> findMax() {
+  const_iterator<InOrder> findMax() {
     if (root == nullptr) {
-      return iterator<InOrder>(nullptr); // Если дерево пустое, возвращаем итератор, указывающий на nullptr
+
+      return const_iterator<InOrder>(nullptr); // Если дерево пустое, возвращаем итератор, указывающий на nullptr
     }
 
     Node* current = root;
     while (current->right != nullptr) { // Переходим к самому правому узлу
       current = current->right;
     }
-    return iterator<InOrder>(current); // Возвращаем итератор, указывающий на максимальный элемент
+
+    return const_iterator<InOrder>(current); // Возвращаем итератор, указывающий на максимальный элемент
   }
 
   // Дополнительные методы для работы с элементами
+
   size_type erase(const value_type& value) {
     Node* current = root;
     Node* parent = nullptr;
@@ -393,6 +398,7 @@ class BinarySearchTree {
     }
 
     if (current == nullptr) {
+
       return 0; // Узел с таким значением не найден
     }
 
@@ -442,26 +448,285 @@ class BinarySearchTree {
       deallocateNode(current);
       erased = 1;
     }
+
     return erased;
   }
 
-  iterator<InOrder> extract(const_iterator<InOrder> position);
-  void merge(BinarySearchTree& source);
-  size_type count(const value_type& value) const;
-  iterator<InOrder> lower_bound(const value_type& value);
-  iterator<InOrder> upper_bound(const value_type& value);
-  bool contains(const value_type& value) const;
-  std::pair<iterator<InOrder>, iterator<InOrder>> equal_range(const value_type& value);
+  const_iterator<InOrder> extract(const_iterator<InOrder> position) {
+    if (position.get_node() == nullptr) {
+
+      return const_iterator<InOrder>(nullptr);
+    }
+
+    Node* nodeToRemove = const_cast<Node*>(position.get_node());
+    Node* successor = nullptr;
+
+    // Узел имеет двух потомков
+    if (nodeToRemove->left != nullptr && nodeToRemove->right != nullptr) {
+      successor = nodeToRemove->right;
+      while (successor->left != nullptr) { // Находим преемника
+        successor = successor->left;
+      }
+      nodeToRemove->value = successor->value; // Копируем значение преемника в удаляемый узел
+      nodeToRemove = successor; // Теперь удаляем узел-преемник
+    }
+
+    // Узел имеет не более одного потомка (случаи 1 и 2)
+    successor = (nodeToRemove->left != nullptr) ? nodeToRemove->left : nodeToRemove->right;
+
+    if (successor != nullptr) { // Узел имеет одного потомка
+      if (nodeToRemove->parent != nullptr) {
+        if (nodeToRemove == nodeToRemove->parent->left) {
+          nodeToRemove->parent->left = successor;
+        } else {
+          nodeToRemove->parent->right = successor;
+        }
+      } else {
+        root = successor; // Удаляемый узел является корнем
+      }
+      successor->parent = nodeToRemove->parent;
+    } else if (nodeToRemove->parent == nullptr) { // Удаляемый узел является корнем и не имеет потомков
+      root = nullptr;
+    } else { // Удаляемый узел не имеет потомков
+      if (nodeToRemove == nodeToRemove->parent->left) {
+        nodeToRemove->parent->left = nullptr;
+      } else {
+        nodeToRemove->parent->right = nullptr;
+      }
+    }
+
+    // Освобождаем память удаляемого узла
+    deallocateNode(nodeToRemove);
+
+    return const_iterator<InOrder>(successor);
+  }
+
+  void insertNodesFrom(Node* node) {
+    if (node != nullptr) {
+      // Вставляем значение текущего узла
+      insert(node->value);
+
+      // Рекурсивно вставляем левое поддерево
+      insertNodesFrom(node->left);
+
+      // Рекурсивно вставляем правое поддерево
+      insertNodesFrom(node->right);
+    }
+  }
+
+  void merge(BinarySearchTree& source) {
+    // Рекурсивно вставляем каждый узел из source в текущее дерево
+    insertNodesFrom(source.root);
+
+    // Очищаем исходное дерево после слияния
+    source.clear();
+  }
+
+  size_type count(const value_type& value) const {
+    Node* current = root; // Начинаем поиск с корня дерева
+    while (current != nullptr) {
+      if (value == current->value) {
+        return 1; // Элемент найден, возвращаем 1
+      } else if (Compare()(value, current->value)) {
+        current = current->left; // Переходим к левому поддереву
+      } else {
+        current = current->right; // Переходим к правому поддереву
+      }
+    }
+
+    return 0; // Элемент не найден, возвращаем 0
+  }
+
+  bool contains(const value_type& value) const {
+    Node* current = root; // Начинаем поиск с корня дерева
+    while (current != nullptr) {
+      if (value == current->value) {
+        return true; // Значение найдено
+      } else if (Compare()(value, current->value)) {
+        current = current->left; // Переходим к левому поддереву
+      } else {
+        current = current->right; // Переходим к правому поддереву
+      }
+    }
+
+    return false; // Значение не найдено в дереве
+  }
+
+  const_iterator<InOrder> lower_bound(const value_type& value) const {
+    const Node* node = root;
+    const Node* result = nullptr; // Изначально устанавливаем результат на nullptr
+
+    while (node != nullptr) {
+      if (node->value < value) {
+        // Если значение узла меньше искомого, идем вправо
+        node = node->right;
+      } else {
+        // Если значение узла больше или равно, запоминаем узел и идем влево
+        result = node;
+        node = node->left;
+      }
+    }
+    // Возвращаем итератор на найденный узел или на end, если узел не найден
+    return const_iterator<InOrder>(result, root);
+  }
+
+  const_iterator<InOrder> upper_bound(const value_type& value) const {
+    const Node* node = root;
+    const Node* result = nullptr; // Изначально устанавливаем результат на nullptr
+
+    while (node != nullptr) {
+      if (node->value <= value) {
+        // Если значение узла меньше или равно искомому, идем вправо
+        node = node->right;
+      } else {
+        // Если значение узла строго больше, запоминаем узел и идем влево
+        result = node;
+        node = node->left;
+      }
+    }
+    // Возвращаем итератор на найденный узел или на end, если узел не найден
+    return const_iterator<InOrder>(result, root);
+  }
+
+  std::pair<const_iterator<InOrder>, const_iterator<InOrder>> equal_range(const value_type& value) const {
+
+    return std::make_pair(lower_bound(value), upper_bound(value));
+  }
 
   // Методы контейнера
-  iterator<InOrder> begin() noexcept;
-  const_iterator<InOrder> cbegin() const noexcept;
-  iterator<InOrder> end() noexcept;
-  const_iterator<InOrder> cend() const noexcept;
-  reverse_iterator_in_order rbegin() noexcept;
-  const_reverse_iterator_in_order crbegin() const noexcept;
-  reverse_iterator_in_order rend() noexcept;
-  const_reverse_iterator_in_order crend() const noexcept;
+  template<typename Order>
+  const_iterator<Order> begin() const {
+    if constexpr (std::is_same_v<Order, InOrder>) {
+      Node* n = root;
+      while (n && n->left) {
+        n = n->left; // Находим наименьший элемент в дереве
+      }
+
+      return const_iterator<Order>(n);
+    } else if constexpr (std::is_same_v<Order, PreOrder>) {
+      return const_iterator<Order>(root); // В PreOrder обход начинается с корня
+    } else if constexpr (std::is_same_v<Order, PostOrder>) {
+      Node* n = root;
+      if (n) {
+        while (n->left || n->right) {
+          while (n->left) {
+            n = n->left;
+          }
+          if (n->right) {
+            n = n->right;
+          }
+        }
+      }
+
+      return const_iterator<Order>(n); // В PostOrder обход начинается с самого левого листа
+    }
+  }
+
+  template<typename Order>
+  const_iterator<Order> end() const {
+
+    return const_iterator<Order>(nullptr, root);
+  }
+
+  template<typename Order>
+  const_iterator<Order> cbegin() const {
+    if constexpr (std::is_same_v<Order, InOrder>) {
+      Node* n = root;
+      while (n && n->left) {
+        n = n->left; // Находим наименьший элемент в дереве
+      }
+
+      return const_iterator<Order>(n);
+    } else if constexpr (std::is_same_v<Order, PreOrder>) {
+      return const_iterator<Order>(root); // В PreOrder обход начинается с корня
+    } else if constexpr (std::is_same_v<Order, PostOrder>) {
+      Node* n = root;
+      if (n) {
+        while (n->left || n->right) {
+          while (n->left) {
+            n = n->left;
+          }
+          if (n->right) {
+            n = n->right;
+          }
+        }
+      }
+
+      return const_iterator<Order>(n); // В PostOrder обход начинается с самого левого листа
+    }
+  }
+
+  template<typename Order>
+  const_iterator<Order> cend() const {
+
+    return const_iterator<Order>(nullptr, root); // Все обходы заканчиваются на nullptr
+  }
+
+  template<typename Order>
+  const_iterator<Order> rbegin() const {
+    if constexpr (std::is_same_v<Order, InOrder>) {
+      Node* n = root;
+      while (n && n->right) { // Идем по правой ветке, чтобы найти максимальный элемент
+        n = n->right;
+      }
+
+      return const_iterator<Order>(n);
+    } else if constexpr (std::is_same_v<Order, PreOrder>) {
+      Node* n = root;
+      while (n) { // Идем по правой ветке до самого конца
+        if (n->right) {
+          n = n->right;
+        } else if (n->left) {
+          n = n->left;
+        } else {
+          break; // Дошли до листа
+        }
+      }
+
+      return const_iterator<Order>(n);
+    } else if constexpr (std::is_same_v<Order, PostOrder>) {
+      return const_iterator<Order>(root); // В PostOrder rbegin начинается с корня
+    }
+  }
+
+  template<typename Order>
+  const_iterator<Order> rend() const {
+
+    return const_iterator<Order>(nullptr); // Во всех случаях rend указывает на nullptr
+  }
+
+  template<typename Order>
+  const_iterator<Order> crbegin() const {
+    if constexpr (std::is_same_v<Order, InOrder>) {
+      Node* n = root;
+      while (n && n->right) { // Идем по правой ветке, чтобы найти максимальный элемент
+        n = n->right;
+      }
+
+      return const_iterator<Order>(n);
+    } else if constexpr (std::is_same_v<Order, PreOrder>) {
+      Node* n = root;
+      while (n) { // Идем по правой ветке до самого конца
+        if (n->right) {
+          n = n->right;
+        } else if (n->left) {
+          n = n->left;
+        } else {
+          break; // Дошли до листа
+        }
+      }
+
+      return const_iterator<Order>(n);
+    } else if constexpr (std::is_same_v<Order, PostOrder>) {
+      return const_iterator<Order>(root); // В PostOrder rbegin начинается с корня
+    }
+  }
+
+  template<typename Order>
+  const_iterator<Order> crend() const {
+
+    return const_iterator<Order>(nullptr); // Во всех случаях rend указывает на nullptr
+  }
 
   bool empty() const noexcept {
     return root == nullptr;
@@ -471,19 +736,23 @@ class BinarySearchTree {
     if (node == nullptr) {
       return 0;
     } else {
+
       return 1 + countNodes(node->left) + countNodes(node->right);
     }
   }
 
   size_type size() const noexcept {
+
     return countNodes(root);
   }
 
   size_type max_size() const noexcept {
+
     return std::allocator_traits<allocator_type>::max_size(node_allocator_);
   }
 
   allocator_type get_allocator() const noexcept {
+
     return node_allocator_;
   }
 };
